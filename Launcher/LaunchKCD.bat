@@ -1,69 +1,49 @@
 @echo off
 setlocal enabledelayedexpansion
 
-REM -----------------------------------------------------
-REM LaunchKCD_DebugREM pauses.bat
-REM With additional debug REM pauses + a short re-check delay
-REM For "The Not-So-Smart AutoSave"
-REM -----------------------------------------------------
+REM ----------------------------------------------------------------
+REM LaunchKCD.bat - Version 1.1
+REM Fully updated version with watchdog for AutoSaveScript.ahk.
+REM This batch file:
+REM   1) Launches AutoSaveScript.ahk.
+REM   2) Launches the game (KingdomCome.exe) via Steam, Epic, or custom settings.
+REM   3) Monitors that AutoSaveScript.ahk is running while the game is active.
+REM      If the AHK script stops unexpectedly, it is restarted. 
+REM ----------------------------------------------------------------
 
-:: 1) Define path to AutoSaveScript.ahk (avoid double slash issues)
+:: 1) Define the path to AutoSaveScript.ahk (avoid double slash issues)
 set "AHK_SCRIPT=%~dp0AutoSaveScript.ahk"
 
-REM [Debug] 1) Checking for AutoSaveScript.ahk...
 if not exist "%AHK_SCRIPT%" (
     echo [Error] AutoSaveScript.ahk not found in the Launcher directory.
     echo Please ensure AutoSaveScript.ahk exists in:
     echo %~dp0
-    REM pause
     exit /B 254
 )
-REM [Debug] AutoSaveScript.ahk found.
-REM pause
 
-:: 2) Read config.ini for Platform
+:: 2) Read config.ini to determine the Platform setting
 set "configPath=%~dp0..\config.ini"
-
-REM [Debug] 2) Reading Platform from config.ini...
-REM pause
-
 for /f "tokens=1,* delims==" %%A in (
     'findstr /r "^Platform=" "%configPath%"'
 ) do (
     set "Platform=%%B"
 )
-
-:: Strip any possible trailing carriage returns or spaces:
+:: Remove any carriage returns or spaces
 set "Platform=%Platform:\r=%"
 set "Platform=%Platform: =%"
 
-REM [Debug] Raw platform is: "%Platform%"
-REM pause
-
-:: 3) Determine the launch command based on nested if logic:
-REM [Debug] 3) Deciding which platform logic to use...
-REM pause
-
+:: 3) Determine the game launch command based on the Platform value
 set "gameLaunchCommand="
-
 if "%Platform%"=="1" (
     :: Steam
-    REM [Debug] => Chosen: Steam
     set "gameLaunchCommand=steam://rungameid/1771300"
-    REM pause
 ) else (
     if "%Platform%"=="2" (
         :: Epic
-        REM [Debug] => Chosen: Epic
         set "gameLaunchCommand=[EPIC_SHORTCUT_ONLY]"
-        REM pause
     ) else (
         if "%Platform%"=="3" (
-            :: Custom
-            REM [Debug] => Chosen: Custom
-            REM [Debug] Also reading GameLaunchCommand from config.ini...
-            REM pause
-
+            :: Custom command – read from config.ini
             for /f "tokens=1,* delims==" %%A in (
                 'findstr /r "^GameLaunchCommand=" "%configPath%"'
             ) do (
@@ -71,114 +51,82 @@ if "%Platform%"=="1" (
             )
             set "GameLaunchCommand=%GameLaunchCommand:\r=%"
             set "GameLaunchCommand=%GameLaunchCommand: =%"
-            
             echo [Debug] Custom GameLaunchCommand read as: "%GameLaunchCommand%"
-            REM pause
         ) else (
-            :: Default to Steam if not recognized
-            REM [Debug] => Chosen: ^(Unrecognized^) Defaulting to Steam
+            :: Default to Steam if Platform is unrecognized
             set "gameLaunchCommand=steam://rungameid/1771300"
-            REM pause
         )
     )
 )
 
-REM [Debug] Final gameLaunchCommand: "%gameLaunchCommand%"
-REM pause
-
 :: 4) Launch AutoSaveScript.ahk first
-REM [Debug] 4) Launching AutoSaveScript.ahk...
+echo Launching AutoSaveScript.ahk...
 start "" "%AHK_SCRIPT%"
-REM [Debug] AutoSaveScript started.
-REM pause
 
-:: 5) Launch the game based on final gameLaunchCommand
-REM [Debug] 5) Launching the game now...
-REM pause
-
-REM [Debug] gameLaunchCommand: %gameLaunchCommand%
-REM pause
-
-:: Define the .url file you want for Epic
-set "ShortcutName=Kingdom Come Deliverance II.url"
-REM [DEBUG] ShortcutName is: [%ShortcutName%]
-REM pause
-
-:: Nested if (no "else if" on the same line)
+:: 5) Launch the game based on the platform
 if "%gameLaunchCommand%"=="[EPIC_SHORTCUT_ONLY]" (
-    :: EPIC-specific approach
-    REM [Debug] USERPROFILE is: "%USERPROFILE%"
-    REM pause
-
-    REM [DEBUG] ShortcutName WITHIN is: [%ShortcutName%]
-    REM [DEBUG] User Profile is: [%USERPROFILE%]
-    REM pause
-
-    ::  -- 1) Check OneDrive first --
+    :: Epic-specific approach using a desktop shortcut
+    set "ShortcutName=Kingdom Come Deliverance II.url"
     set "DesktopShortcutOne=%USERPROFILE%\OneDrive\Desktop\%ShortcutName%"
-    REM [Debug] Checking OneDrive path: "!DesktopShortcutOne!"
-    REM pause
-
     if exist "!DesktopShortcutOne!" (
-        REM [Debug] Found in OneDrive! Using this path.
         set "DesktopShortcut=!DesktopShortcutOne!"
     ) else (
-        ::  -- 2) Fallback to local Desktop --
         set "DesktopShortcut=%USERPROFILE%\Desktop\%ShortcutName%"
-        REM [Debug] Checking local Desktop path: "!DesktopShortcut!"
-        REM pause
     )
-
-    ::  -- 3) If still not exist, wait 3s and re-check --
     if not exist "!DesktopShortcut!" (
-        REM [Debug] Attempt #1: Shortcut not found. Waiting 3s and re-checking...
+        REM Wait a few seconds to see if the shortcut appears
         timeout /T 3 >nul
-
         if not exist "!DesktopShortcut!" (
-            echo [Error] Even after wait, Epic desktop shortcut not found!
-            echo Please create "!ShortcutName!" on your Desktop
-            echo or OneDrive\Desktop via the Epic Games Launcher.
-            REM pause
+            echo [Error] Epic desktop shortcut not found!
+            echo Please create "!ShortcutName!" on your Desktop or OneDrive\Desktop.
             exit /B 1
         )
     )
-
-    :: If we get here, the file exists
-    REM [Debug] Found Epic shortcut: "!DesktopShortcut!"
+    echo Launching Epic game via desktop shortcut...
     start "" "!DesktopShortcut!"
-    REM [Debug] Epic game launched via desktop shortcut.
-
 ) else (
     if "%Platform%"=="3" (
-        :: If user typed "Platform=3" we rely on gameLaunchCommand from config
-        REM [Debug] Launching Custom command: "%gameLaunchCommand%"
-        start "" "%gameLaunchCommand%"
+        echo Launching custom game command: "%GameLaunchCommand%"
+        start "" "%GameLaunchCommand%"
     ) else (
-        :: Steam or default
-        REM [Debug] Launching Steam command: "%gameLaunchCommand%"
+        echo Launching game via Steam command: "%gameLaunchCommand%"
         start "" "%gameLaunchCommand%"
     )
 )
 
-REM [Debug] Game launch command executed.
-REM pause
-
-:: 6) Wait for the game to close
-REM [Debug] 6) Now waiting for KingdomCome.exe to exit...
-REM pause
-
+:: 6) Monitor the game and check for the AutoSaveScript.ahk process.
 :WaitForGame
-REM [Debug] Checking for KingdomCome.exe...
-timeout /T 5 /NOBREAK >NUL
-tasklist /FI "IMAGENAME eq KingdomCome.exe" | find /I "KingdomCome.exe" >NUL
+    timeout /T 2 /NOBREAK >nul
 
-if "%ERRORLEVEL%"=="0" (
-    goto WaitForGame
-)
+    :: Check if the game (KingdomCome.exe) is still running.
+    tasklist /FI "IMAGENAME eq KingdomCome.exe" | find /I "KingdomCome.exe" >nul
+    if "%ERRORLEVEL%"=="0" (
+        
+        set "ahkRunning="
 
-REM [Debug] KingdomCome.exe closed. AHK script should terminate soon.
-REM pause
+        echo Debug: Starting tasklist query for AutoSaveScript.ahk...
 
-REM [Debug] Exiting batch script...
-REM pause
-exit /B 0
+        :: Check the verbose tasklist output for known AutoHotkey processes.
+        for %%p in (AutoHotkeyU64.exe AutoHotkeyUX.exe AutoHotkey.exe) do (
+            for /f "skip=3 tokens=*" %%a in ('tasklist /V /FI "IMAGENAME eq %%p"') do (
+                echo %%a | findstr /I "AutoSaveScript.ahk" >nul
+                if "%ERRORLEVEL%"=="0" (
+                    set "ahkRunning=1"
+                )
+            )
+        )
+
+        echo Debug: tasklist query complete. ahkRunning is: %ahkRunning%
+
+        if not defined ahkRunning (
+            echo [Debug] AutoSaveScript.ahk is NOT running. Restarting...
+            start "" "%AHK_SCRIPT%"
+        ) else (
+            echo [Debug] AutoSaveScript.ahk is running.
+        )
+
+        goto WaitForGame
+    ) else (
+        echo Game process closed. Exiting batch script.
+        exit /B 0
+    )

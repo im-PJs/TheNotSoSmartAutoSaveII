@@ -1,5 +1,7 @@
 #SingleInstance Force
 #Persistent
+
+; Version 1.1
 Menu, Tray, NoStandard  ; Remove the default menu items
 Menu, Tray, Add, Exit, ExitApp  ; Add an Exit option
 

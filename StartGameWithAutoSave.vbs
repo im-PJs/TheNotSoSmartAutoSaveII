@@ -1,3 +1,4 @@
+' Version 1.1
 Set WshShell = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
 
